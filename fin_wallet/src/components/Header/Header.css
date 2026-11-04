@@ -1,0 +1,18 @@
+.top-header { position: sticky; z-index: 10; top: 0; display: flex; height: 75px; align-items: center; justify-content: space-between; padding: 0 52px; border-bottom: 1px solid #f0e9f0; background: #fffdf9eF; backdrop-filter: blur(14px); }
+.header-location { display: flex; flex-direction: column; gap: 5px; }
+.header-location > span { color: #a095a5; font-size: 8px; font-weight: 700; letter-spacing: .14em; }
+.header-location > span b { padding: 0 4px; color: #ff4d8d; }
+.header-location > strong { text-transform: capitalize; font-family: "Space Grotesk", sans-serif; font-size: 12px; }
+.header-actions { display: flex; align-items: center; gap: 15px; }
+.notification-button { position: relative; display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #e6dce8; border-radius: 13px; background: white; font-size: 20px; cursor: pointer; }
+.notification-button > i { position: absolute; top: -5px; right: -5px; display: grid; min-width: 17px; height: 17px; place-items: center; padding: 0 3px; border: 1px solid #23192d; border-radius: 7px; color: #23192d; background: #ffb9cf; font-size: 8px; font-style: normal; font-weight: 700; }
+.header-avatar { width: 37px; height: 37px; border-radius: 13px; background: #ffe5ec; }
+.mobile-brand { display: none; align-items: center; gap: 9px; font-family: "Space Grotesk", sans-serif; font-size: 15px; letter-spacing: -.04em; }
+.mobile-brand .brand-mark { width: 34px; height: 34px; border-radius: 12px; font-size: 21px; }
+
+@media (max-width: 1150px) {
+  .top-header { padding: 0 32px; }
+}
+@media (max-width: 600px) {
+  .top-header { padding: 0 16px; }
+}
