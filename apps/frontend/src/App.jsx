@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { FinanceProvider } from "./context/FinanceContext";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
 import { today } from "./context/financeUtils";
 import { useFinance } from "./context/useFinance";
 import Header from "./components/Header/Header";
 import Sidebar from "./components/Sidebar/Sidebar";
 import QuickActionModal from "./components/QuickActionModal";
 import { Analytics, Dashboard, Planning, Settings, Transactions } from "./components/FinanceViews";
+import LandingPage from "./components/LandingPage";
+import AuthPage from "./components/AuthPage";
 
 const pages = {
   home: { title: "Inicio", component: Dashboard },
@@ -17,6 +21,7 @@ const pages = {
 };
 
 function AppShell() {
+  const { user } = useAuth();
   const { preferences, processAutomaticPayments } = useFinance();
   const [activeView, setActiveView] = useState("home");
   const [modalOpen, setModalOpen] = useState(false);
@@ -42,7 +47,7 @@ function AppShell() {
   return <div className={`app-shell theme-${preferences.theme}`}>
     <Sidebar activeView={activeView} onSelect={setActiveView}/>
     <div className="app-main">
-      <Header title={pages[activeView].title}/>
+      <Header title={pages[activeView].title} user={user}/>
       <main className="main-content">
         {activeView === "home" && <Dashboard onCreate={openNewTransaction}/>}
         {activeView === "transactions" && <Transactions onEdit={openEditTransaction}/>}
@@ -56,8 +61,24 @@ function AppShell() {
   </div>;
 }
 
+function AuthGate() {
+  const { user, loading, signIn, signUp, signInDemo } = useAuth();
+  const [authView, setAuthView] = useState("landing");
+
+  useEffect(() => {
+    const showLanding = () => setAuthView("landing");
+    window.addEventListener("fin-wallet-logged-out", showLanding);
+    return () => window.removeEventListener("fin-wallet-logged-out", showLanding);
+  }, []);
+
+  if (loading) return <div className="auth-loading">fin wallet ✿</div>;
+  if (user) return <FinanceProvider key={user.id}><AppShell/></FinanceProvider>;
+  if (authView === "landing") return <LandingPage onNavigate={setAuthView} onDemo={signInDemo}/>;
+  return <AuthPage mode={authView} onNavigate={setAuthView} onLogin={signIn} onSignUp={signUp} onDemo={signInDemo}/>;
+}
+
 function App() {
-  return <FinanceProvider><AppShell/></FinanceProvider>;
+  return <AuthProvider><AuthGate/></AuthProvider>;
 }
 
 export default App;

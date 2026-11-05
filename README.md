@@ -23,8 +23,8 @@ apps/
    npm install
    ```
 
-2. Copia `apps/backend/.env.example` como `apps/backend/.env` y ajusta `MONGODB_URI`. El valor de ejemplo requiere un replica set `rs0`.
-3. Inicializa datos de demostración:
+2. Copia `apps/backend/.env.example` como `apps/backend/.env`, configura `MONGODB_URI` y reemplaza `JWT_SECRET` por un valor aleatorio privado (por ejemplo, `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"`). El valor de MongoDB de ejemplo requiere un replica set `rs0`.
+3. Opcionalmente, carga datos de demostración:
 
    ```sh
    npm run seed
@@ -36,7 +36,9 @@ apps/
    npm run dev
    ```
 
-El frontend corre en `http://localhost:5173` y la API en `http://localhost:4000`. Vite reenvía `/api` al backend. También puedes iniciar cada paquete por separado con `npm run dev:frontend` o `npm run dev:backend`.
+El frontend corre en `http://localhost:5173` y la API en `http://localhost:4000`. Vite reenvía `/api` al backend. También puedes iniciar cada paquete por separado con `npm run dev:frontend` o `npm run dev:backend`. Si MongoDB no está disponible, el proceso del frontend permanece activo para que puedas usar la autenticación y los datos en modo local.
+
+Al abrir la app puedes crear una cuenta o iniciar sesión. Durante el desarrollo está disponible **Probar Demo Rápida**; crea datos de ejemplo aislados para esa cuenta demo. El primer registro en una base existente asocia los datos previos sin propietario a esa primera cuenta para conservar los datos de la instalación anterior.
 
 ## Scripts de workspace
 
@@ -45,9 +47,9 @@ El frontend corre en `http://localhost:5173` y la API en `http://localhost:4000`
 - `npm run dev:backend`: inicia Express con recarga.
 - `npm run build`: compila el frontend.
 - `npm run lint`: ejecuta ESLint en el frontend.
-- `npm run seed`: reemplaza la base de datos con datos de demostración.
+- `npm run seed`: reemplaza únicamente los datos de la cuenta demo.
 
-El seed borra las colecciones de Fin Wallet antes de insertar sus datos. No lo ejecutes sobre una base de datos con datos que quieras conservar.
+El seed no borra información de otras cuentas.
 
 ## Persistencia y modo híbrido
 
@@ -57,7 +59,13 @@ La variable opcional `VITE_API_URL` del frontend permite cambiar la ruta base de
 
 ## Semilla y restauración
 
-`npm run seed` y `POST /api/seed/reset` recrean categorías, medios de pago, metas, presupuestos, pagos recurrentes y movimientos de ejemplo. En `NODE_ENV=production`, el endpoint de restauración exige `SEED_RESET_TOKEN` en el servidor mediante el header `x-seed-reset-token`; el token nunca debe incluirse en el frontend.
+`npm run seed` restaura los datos de la cuenta demo. `POST /api/seed/reset` está autenticado y solo restaura los datos de la cuenta que hizo la solicitud. El inicio de sesión demo está deshabilitado en producción.
+
+## Autenticación
+
+La API usa JWT con expiración de siete días. `JWT_SECRET` debe configurarse con un secreto aleatorio fuera de producción; el secreto efímero de desarrollo invalida las sesiones al reiniciar el backend. Las colecciones financieras incluyen `userId`, y las lecturas, cambios, referencias y eliminaciones se limitan al usuario autenticado.
+
+Si la API no está disponible, los formularios pueden crear e iniciar sesión con cuentas locales. Las contraseñas de respaldo se almacenan como derivaciones PBKDF2 con sal en el navegador; los movimientos locales se separan por cuenta.
 
 ## Seguridad de configuración
 

@@ -13,9 +13,12 @@ export class ApiError extends Error {
 export async function apiRequest(path: string, options: RequestInit = {}) {
   let response: Response;
   try {
+    const token = localStorage.getItem("fin_wallet_token");
+    const authMode = localStorage.getItem("fin_wallet_auth_mode");
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
+        ...(token && authMode !== "local" ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...options.headers,
       },

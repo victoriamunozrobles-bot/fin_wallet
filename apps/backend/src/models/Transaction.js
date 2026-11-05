@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const transactionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
   type: { type: String, enum: ["income", "expense", "transfer_to_savings"], required: true, index: true },
   amount: { type: Number, required: true, min: 0.01 },
   date: { type: Date, required: true, index: true },

@@ -1,25 +1,43 @@
 import RecurringPayment from "../models/RecurringPayment.js";
+import Category from "../models/Category.js";
+import PaymentMethod from "../models/PaymentMethod.js";
 import Transaction from "../models/Transaction.js";
 import { asyncHandler, httpError, inTransaction } from "../utils/asyncHandler.js";
 
-export const listRecurringPayments = asyncHandler(async (_req, res) => {
-  res.json(await RecurringPayment.find().populate("categoryId paymentMethodId").sort({ billingDay: 1 }).lean());
+export const listRecurringPayments = asyncHandler(async (req, res) => {
+  res.json(await RecurringPayment.find({ userId: req.user._id }).populate("categoryId paymentMethodId").sort({ billingDay: 1 }).lean());
 });
 
 export const createRecurringPayment = asyncHandler(async (req, res) => {
-  const payment = await RecurringPayment.create(req.body);
+  await validateRecurringReferences(req.body, req.user._id);
+  const payment = await RecurringPayment.create({ ...req.body, userId: req.user._id });
   await payment.populate("categoryId paymentMethodId");
   res.status(201).json(payment);
 });
 
 export const updateRecurringPayment = asyncHandler(async (req, res) => {
-  const payment = await RecurringPayment.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).populate("categoryId paymentMethodId");
+  const { userId: _userId, ...updates } = req.body;
+  if (updates.categoryId || updates.paymentMethodId) {
+    const current = await RecurringPayment.findOne({ _id: req.params.id, userId: req.user._id }).lean();
+    if (!current) throw httpError(404, "Pago automático no encontrado.");
+    await validateRecurringReferences({ ...current, ...updates }, req.user._id);
+  }
+  const payment = await RecurringPayment.findOneAndUpdate({ _id: req.params.id, userId: req.user._id }, updates, { new: true, runValidators: true }).populate("categoryId paymentMethodId");
   if (!payment) throw httpError(404, "Pago automático no encontrado.");
   res.json(payment);
 });
 
+async function validateRecurringReferences(payment, userId) {
+  const [category, method] = await Promise.all([
+    Category.exists({ _id: payment.categoryId, userId, type: "expense" }),
+    PaymentMethod.exists({ _id: payment.paymentMethodId, userId }),
+  ]);
+  if (!category) throw httpError(400, "La categoría de gasto indicada no existe.");
+  if (!method) throw httpError(400, "El medio de pago indicado no existe.");
+}
+
 export const deleteRecurringPayment = asyncHandler(async (req, res) => {
-  const payment = await RecurringPayment.findByIdAndDelete(req.params.id);
+  const payment = await RecurringPayment.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
   if (!payment) throw httpError(404, "Pago automático no encontrado.");
   res.status(204).end();
 });
@@ -29,18 +47,19 @@ export const processDuePayments = asyncHandler(async (req, res) => {
   if (Number.isNaN(now.getTime())) throw httpError(400, "date no es una fecha válida.");
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const day = now.getDate();
-  const candidates = await RecurringPayment.find({ active: true, billingDay: { $lte: day }, lastBilledPeriod: { $ne: period } }).select("_id");
+  const candidates = await RecurringPayment.find({ userId: req.user._id, active: true, billingDay: { $lte: day }, lastBilledPeriod: { $ne: period } }).select("_id");
   const created = [];
   for (const candidate of candidates) {
     const transaction = await inTransaction(async (session) => {
       const claimed = await RecurringPayment.findOneAndUpdate(
-        { _id: candidate._id, active: true, billingDay: { $lte: day }, lastBilledPeriod: { $ne: period } },
+        { _id: candidate._id, userId: req.user._id, active: true, billingDay: { $lte: day }, lastBilledPeriod: { $ne: period } },
         { $set: { lastBilledPeriod: period } },
         { new: true, session },
       );
       if (!claimed) return null;
       const [charge] = await Transaction.create([{
         type: "expense",
+        userId: req.user._id,
         amount: claimed.amount,
         date: now,
         description: `${claimed.serviceName} · pago automático`,
@@ -63,13 +82,14 @@ export const simulateRecurringPayment = asyncHandler(async (req, res) => {
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const transaction = await inTransaction(async (session) => {
     const claimed = await RecurringPayment.findOneAndUpdate(
-      { _id: req.params.id, active: true, lastBilledPeriod: { $ne: period } },
+      { _id: req.params.id, userId: req.user._id, active: true, lastBilledPeriod: { $ne: period } },
       { $set: { lastBilledPeriod: period } },
       { new: true, session },
     );
     if (!claimed) throw httpError(409, "Este pago ya fue registrado este mes o está inactivo.");
     const [charge] = await Transaction.create([{
       type: "expense",
+      userId: req.user._id,
       amount: claimed.amount,
       date: now,
       description: `${claimed.serviceName} · pago automático`,

@@ -33,23 +33,25 @@ import {
 } from "../controllers/transactionController.js";
 import { resetSeed } from "../controllers/seedController.js";
 import { asyncHandler, httpError } from "../utils/asyncHandler.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import auth from "./auth.js";
 
 const api = Router();
 const categoryController = resourceController(Category, {
-  beforeDelete: async (item) => {
+  beforeDelete: async (item, userId) => {
     const referenced = await Promise.all([
-      Transaction.exists({ categoryId: item._id }),
-      Budget.exists({ categoryId: item._id }),
-      RecurringPayment.exists({ categoryId: item._id }),
+      Transaction.exists({ userId, categoryId: item._id }),
+      Budget.exists({ userId, categoryId: item._id }),
+      RecurringPayment.exists({ userId, categoryId: item._id }),
     ]);
     if (referenced.some(Boolean)) throw httpError(409, "La categoría está asociada a movimientos, presupuestos o pagos automáticos.");
   },
 });
 const paymentMethodController = resourceController(PaymentMethod, {
-  beforeDelete: async (item) => {
+  beforeDelete: async (item, userId) => {
     const referenced = await Promise.all([
-      Transaction.exists({ paymentMethodId: item._id }),
-      RecurringPayment.exists({ paymentMethodId: item._id }),
+      Transaction.exists({ userId, paymentMethodId: item._id }),
+      RecurringPayment.exists({ userId, paymentMethodId: item._id }),
     ]);
     if (referenced.some(Boolean)) throw httpError(409, "El medio de pago está asociado a movimientos o pagos automáticos.");
   },
@@ -57,6 +59,8 @@ const paymentMethodController = resourceController(PaymentMethod, {
 const debtController = resourceController(Debt);
 
 api.get("/health", (_req, res) => res.json({ status: "ok", database: "connected" }));
+api.use("/auth", auth);
+api.use(authMiddleware);
 api.get("/dashboard/summary", getDashboardSummary);
 
 api.route("/transactions")

@@ -1,4 +1,5 @@
 import "./Sidebar.css";
+import { useAuth } from "../../context/useAuth";
 
 const links = [
   { id: "home", icon: "⌂", label: "Inicio" },
@@ -9,6 +10,8 @@ const links = [
 ];
 
 function Sidebar({ activeView, onSelect }) {
+  const { user, signOut } = useAuth();
+  const initials = user?.name?.trim()?.[0]?.toUpperCase() ?? "F";
   return <aside className="sidebar">
     <button className="brand-lockup" onClick={() => onSelect("home")} aria-label="Fin Wallet, ir a Inicio">
       <span className="brand-mark">f<span>.</span></span><span className="brand-name">fin wallet<small>dinero en calma</small></span>
@@ -20,7 +23,8 @@ function Sidebar({ activeView, onSelect }) {
       </button>)}
     </nav>
     <div className="sidebar-note"><span>✦</span><strong>Un paso a la vez</strong><p>Pequeños hábitos crean una relación más bonita con tu dinero.</p></div>
-    <div className="sidebar-profile"><span className="avatar">V</span><div><strong>Mi espacio</strong><span>Finanzas personales</span></div><span className="profile-dots">···</span></div>
+    <div className="sidebar-profile"><span className="avatar">{initials}</span><div><strong>{user?.name}</strong><span>{user?.email}</span></div></div>
+    <button className="sidebar-logout" type="button" onClick={signOut}>↪ Cerrar Sesión</button>
   </aside>;
 }
 

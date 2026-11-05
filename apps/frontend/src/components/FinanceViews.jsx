@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { makeId, today } from "../context/financeUtils";
 import { useFinance } from "../context/useFinance";
+import { useAuth } from "../context/useAuth";
 
 const money = (amount, currency = "CLP") => new Intl.NumberFormat("es-CL", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount || 0);
 const shortDate = (date) => new Date(`${date}T12:00:00`).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
@@ -54,6 +55,7 @@ function UpcomingPayments({ onPayment }) {
 }
 
 export function Dashboard({ onCreate }) {
+  const { user } = useAuth();
   const finance = useFinance();
   const { transactions, alerts, budgets, categories, preferences, totalIncome, totalExpenses, totalSavings, available, processAutomaticPayments, simulateRecurringPayment } = finance;
   const monthTransactions = transactions.filter((item) => item.date.startsWith(monthNow));
@@ -68,7 +70,7 @@ export function Dashboard({ onCreate }) {
 
   const todayLabel = new Date(`${today()}T12:00:00`).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
   return <div className="view-content dashboard-view">
-    <PageHeading eyebrow={todayLabel.toUpperCase()} title="Hola, tus finanzas ✿" description="Un vistazo amable y claro a cómo va tu dinero." action={<button className="button button--plain date-chip" onClick={() => processAutomaticPayments(today())}>◷ <span>Actualizado hoy</span></button>} />
+    <PageHeading eyebrow={todayLabel.toUpperCase()} title={`¡Hola, ${user?.name || "tus finanzas"}! ✨`} description="Un vistazo amable y claro a cómo va tu dinero." action={<button className="button button--plain date-chip" onClick={() => processAutomaticPayments(today())}>◷ <span>Actualizado hoy</span></button>} />
     <section className="balance-grid">
       <article className="balance-card balance-card--main"><div className="balance-card-top"><span className="eyebrow">SALDO DISPONIBLE PARA GASTAR</span><span className="balance-sparkle">✳</span></div><strong>{money(available, preferences.currency)}</strong><p>Lo que tienes para usar, después de gastos y ahorros protegidos.</p><div className="balance-card-foot"><span>↗ Ingresos {money(totalIncome, preferences.currency)}</span><span>↘ Gastos {money(totalExpenses, preferences.currency)}</span></div></article>
       <article className="balance-card balance-card--savings"><span className="eyebrow">AHORROS PROTEGIDOS</span><strong>{money(totalSavings, preferences.currency)}</strong><p>Guardado en tus metas</p><div className="mini-flow"><span>Este mes</span><b className="flow-in">+{money(incomeThisMonth, preferences.currency)}</b><b className="flow-out">−{money(expenseThisMonth, preferences.currency)}</b></div></article>
@@ -272,6 +274,7 @@ export function Planning() {
 }
 
 export function Settings() {
+  const { user, signOut, updateUser } = useAuth();
   const { categories, paymentMethods, automaticPayments, budgets, transactions, preferences, storageMode, apiError, setCollection, setPreferences, simulateRecurringPayment, resetDemoData } = useFinance();
   const [categoryForm, setCategoryForm] = useState(null);
   const [methodForm, setMethodForm] = useState(null);
@@ -321,6 +324,7 @@ export function Settings() {
   };
   return <div className="view-content">
     <PageHeading eyebrow="HECHO A TU MANERA" title="Tu espacio, tus reglas" description="Personaliza las categorías, medios de pago y recordatorios." />
+    <section className="profile-settings panel"><span className="profile-settings-avatar">{user?.name?.trim()?.[0]?.toUpperCase() ?? "F"}</span><div className="profile-settings-copy"><p className="eyebrow">TU CUENTA FIN WALLET</p><strong>{user?.name}</strong><span>{user?.email}</span></div><button className="button button--plain" type="button" onClick={signOut}>↪ Cerrar Sesión</button></section>
     <div className={`connection-banner connection-banner--${storageMode}`}><span className="connection-dot"/><strong>{storageMode === "api" ? "MongoDB API conectada" : storageMode === "connecting" ? "Conectando con la API…" : "Modo Local"}</strong><span>{storageMode === "api" ? "Datos sincronizados con el servidor" : storageMode === "local" ? "Los cambios se guardan en este navegador" : "Cargando tus datos"}</span>{apiError && <small role="alert">{apiError}</small>}</div>
     <section className="settings-section"><div className="section-title"><div><p className="eyebrow">ORGANIZA TUS MOVIMIENTOS</p><h2>Categorías</h2></div><button className="button button--primary" onClick={() => setCategoryForm({ name: "", type: "expense", emoji: "✿", color: "#FFE5EC" })}>＋ Nueva categoría</button></div>
       {categoryForm && <form className="inline-form" onSubmit={saveCategory}><label>Nombre<input required maxLength="24" value={categoryForm.name} onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })}/></label><label>Tipo<select value={categoryForm.type} onChange={(event) => setCategoryForm({ ...categoryForm, type: event.target.value })}><option value="expense">Gasto</option><option value="income">Ingreso</option></select></label><label>Emoji<input maxLength="4" value={categoryForm.emoji} onChange={(event) => setCategoryForm({ ...categoryForm, emoji: event.target.value })}/></label><label>Color<input type="color" value={categoryForm.color} onChange={(event) => setCategoryForm({ ...categoryForm, color: event.target.value })}/></label><button className="button button--primary">Guardar</button><button className="text-button" type="button" onClick={() => setCategoryForm(null)}>Cancelar</button></form>}
@@ -335,6 +339,6 @@ export function Settings() {
       <div className="master-list">{automaticPayments.map((item) => <div className="master-row autopay-master-row" key={item.id}><span className="category-icon pastel-lavender">↻</span><div><strong>{item.name}</strong><span>Día {item.day} · {item.category} · {item.paymentMethod}</span></div><b>{money(item.amount, preferences.currency)}</b><button className="text-button" onClick={() => setPaymentForm({ ...item })}>Editar</button><button className="button button--small button--plain" disabled={item.lastChargedMonth === monthNow} onClick={() => simulateRecurringPayment(item)}>Simular día de cobro</button><button className="icon-button" aria-label={`Eliminar ${item.name}`} onClick={() => { if (window.confirm(`¿Eliminar el pago de ${item.name}?`)) setCollection("automaticPayments", automaticPayments.filter((payment) => payment.id !== item.id)); }}>×</button></div>)}</div>
       <p className="form-hint">Los pagos vencidos se registran al abrir la app. También puedes simular un cobro para probar el flujo completo.</p>
     </section>
-    <section className="settings-section preferences-section"><div className="section-title"><div><p className="eyebrow">EL TOQUE FINAL</p><h2>Preferencias</h2></div></div><div className="preferences-grid"><label>Alerta preventiva<input type="number" min="1" max="99" value={preferences.threshold} onChange={(event) => setPreferences({ threshold: Number(event.target.value) })}/><small>Avisar al llegar a este porcentaje del presupuesto</small></label><label>Moneda<select value={preferences.currency} onChange={(event) => setPreferences({ currency: event.target.value })}><option value="CLP">Peso chileno · CLP</option><option value="ARS">Peso argentino · ARS</option><option value="MXN">Peso mexicano · MXN</option><option value="USD">Dólar · USD</option><option value="EUR">Euro · EUR</option></select></label><label className="theme-setting">Tema de la app<button className="theme-switch" onClick={() => setPreferences({ theme: preferences.theme === "light" ? "dark" : "light" })}>{preferences.theme === "light" ? "☀ Claro" : "☾ Oscuro"}</button></label></div><div className="demo-reset"><div><strong>Restaurar datos de demostración</strong><span>Reemplaza movimientos, presupuestos y metas actuales.</span></div><button className="button button--plain" onClick={confirmReset}>Restaurar datos</button></div></section>
+    <section className="settings-section preferences-section"><div className="section-title"><div><p className="eyebrow">EL TOQUE FINAL</p><h2>Preferencias</h2></div></div><div className="preferences-grid"><label>Alerta preventiva<input type="number" min="1" max="99" value={preferences.threshold} onChange={(event) => setPreferences({ threshold: Number(event.target.value) })}/><small>Avisar al llegar a este porcentaje del presupuesto</small></label><label>Moneda<select value={preferences.currency} onChange={(event) => { const currency = event.target.value; setPreferences({ currency }); updateUser({ currency }).catch((error) => console.error("No se pudo actualizar la moneda del perfil.", error)); }}><option value="CLP">Peso chileno · CLP</option><option value="ARS">Peso argentino · ARS</option><option value="MXN">Peso mexicano · MXN</option><option value="USD">Dólar · USD</option><option value="EUR">Euro · EUR</option></select></label><label className="theme-setting">Tema de la app<button className="theme-switch" onClick={() => setPreferences({ theme: preferences.theme === "light" ? "dark" : "light" })}>{preferences.theme === "light" ? "☀ Claro" : "☾ Oscuro"}</button></label></div><div className="demo-reset"><div><strong>Restaurar datos de demostración</strong><span>Reemplaza movimientos, presupuestos y metas actuales.</span></div><button className="button button--plain" onClick={confirmReset}>Restaurar datos</button></div></section>
   </div>;
 }

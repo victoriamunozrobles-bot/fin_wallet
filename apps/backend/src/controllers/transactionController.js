@@ -16,31 +16,32 @@ function signedSavingsEffect(transaction) {
   return transaction.transferDirection === "withdraw" ? -transaction.amount : transaction.amount;
 }
 
-async function validateReferences(data) {
+async function validateReferences(data, userId) {
   if (data.type !== "transfer_to_savings" && !data.categoryId) throw httpError(400, "categoryId es obligatorio.");
-  if (data.categoryId && !await Category.exists({ _id: data.categoryId })) throw httpError(400, "La categoría indicada no existe.");
-  if (data.paymentMethodId && !await PaymentMethod.exists({ _id: data.paymentMethodId })) throw httpError(400, "El medio de pago indicado no existe.");
+  if (data.categoryId && !await Category.exists({ _id: data.categoryId, userId })) throw httpError(400, "La categoría indicada no existe.");
+  if (data.paymentMethodId && !await PaymentMethod.exists({ _id: data.paymentMethodId, userId })) throw httpError(400, "El medio de pago indicado no existe.");
   if (data.type === "transfer_to_savings" && !data.savingsGoalId) throw httpError(400, "savingsGoalId es obligatorio para un traspaso.");
-  if (data.savingsGoalId && !await SavingsGoal.exists({ _id: data.savingsGoalId })) throw httpError(400, "La meta de ahorro indicada no existe.");
+  if (data.savingsGoalId && !await SavingsGoal.exists({ _id: data.savingsGoalId, userId })) throw httpError(400, "La meta de ahorro indicada no existe.");
 }
 
-async function applyGoalDelta(goalId, delta, session) {
+async function applyGoalDelta(userId, goalId, delta, session) {
   if (!goalId || delta === 0) return;
-  const condition = delta < 0 ? { _id: goalId, currentAmount: { $gte: -delta } } : { _id: goalId };
+  const condition = delta < 0 ? { _id: goalId, userId, currentAmount: { $gte: -delta } } : { _id: goalId, userId };
   const result = await SavingsGoal.updateOne(condition, { $inc: { currentAmount: delta } }, { session, runValidators: true });
   if (result.matchedCount !== 1) throw httpError(400, "El saldo de la meta no alcanza para este retiro.");
 }
 
-async function currentAvailableBalance(session) {
+async function currentAvailableBalance(userId, session) {
   const incomeResult = await Transaction.aggregate([
-    { $match: { type: "income" } },
+    { $match: { userId, type: "income" } },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]).session(session);
   const expenseResult = await Transaction.aggregate([
-    { $match: { type: "expense" } },
+    { $match: { userId, type: "expense" } },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]).session(session);
   const savedResult = await SavingsGoal.aggregate([
+    { $match: { userId } },
     { $group: { _id: null, total: { $sum: "$currentAmount" } } },
   ]).session(session);
   return (incomeResult[0]?.total ?? 0) - (expenseResult[0]?.total ?? 0) - (savedResult[0]?.total ?? 0);
@@ -54,7 +55,7 @@ function parseDate(value, field) {
 
 export const listTransactions = asyncHandler(async (req, res) => {
   const { startDate, endDate, categoryId, paymentMethodId, type, q } = req.query;
-  const filter = {};
+  const filter = { userId: req.user._id };
   if (type) {
     if (!["income", "expense", "transfer_to_savings"].includes(type)) throw httpError(400, "type no es válido.");
     filter.type = type;
@@ -73,8 +74,8 @@ export const listTransactions = asyncHandler(async (req, res) => {
   if (q) {
     const text = String(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const [matchingCategories, matchingMethods] = await Promise.all([
-      Category.find({ name: { $regex: text, $options: "i" } }).distinct("_id"),
-      PaymentMethod.find({ name: { $regex: text, $options: "i" } }).distinct("_id"),
+      Category.find({ userId: req.user._id, name: { $regex: text, $options: "i" } }).distinct("_id"),
+      PaymentMethod.find({ userId: req.user._id, name: { $regex: text, $options: "i" } }).distinct("_id"),
     ]);
     filter.$or = [
       { description: { $regex: text, $options: "i" } },
@@ -87,19 +88,19 @@ export const listTransactions = asyncHandler(async (req, res) => {
 });
 
 export const createTransaction = asyncHandler(async (req, res) => {
-  const data = { ...req.body };
+  const data = { ...req.body, userId: req.user._id };
   if (!["income", "expense", "transfer_to_savings"].includes(data.type)) throw httpError(400, "type no es válido.");
   if (!Number.isFinite(Number(data.amount)) || Number(data.amount) <= 0) throw httpError(400, "amount debe ser mayor a cero.");
   data.amount = Number(data.amount);
   data.date = parseDate(data.date, "date");
-  await validateReferences(data);
+  await validateReferences(data, req.user._id);
   const transaction = await inTransaction(async (session) => {
     if (data.type === "transfer_to_savings") {
       const direction = data.transferDirection ?? "deposit";
       if (!["deposit", "withdraw"].includes(direction)) throw httpError(400, "transferDirection no es válido.");
       const effect = direction === "withdraw" ? -data.amount : data.amount;
-      await applyGoalDelta(data.savingsGoalId, effect, session);
-      if (direction === "deposit" && await currentAvailableBalance(session) < 0) throw httpError(400, "El saldo disponible no alcanza para este ahorro.");
+      await applyGoalDelta(req.user._id, data.savingsGoalId, effect, session);
+      if (direction === "deposit" && await currentAvailableBalance(req.user._id, session) < 0) throw httpError(400, "El saldo disponible no alcanza para este ahorro.");
       data.transferDirection = direction;
     }
     const [created] = await Transaction.create([data], { session });
@@ -111,9 +112,9 @@ export const createTransaction = asyncHandler(async (req, res) => {
 
 export const updateTransaction = asyncHandler(async (req, res) => {
   const transaction = await inTransaction(async (session) => {
-    const previous = await Transaction.findById(req.params.id).session(session);
+    const previous = await Transaction.findOne({ _id: req.params.id, userId: req.user._id }).session(session);
     if (!previous) throw httpError(404, "Transacción no encontrada.");
-    const data = { ...req.body };
+    const { userId: _userId, ...data } = req.body;
     if (data.type && !["income", "expense", "transfer_to_savings"].includes(data.type)) throw httpError(400, "type no es válido.");
     if (data.amount !== undefined) {
       if (!Number.isFinite(Number(data.amount)) || Number(data.amount) <= 0) throw httpError(400, "amount debe ser mayor a cero.");
@@ -121,12 +122,12 @@ export const updateTransaction = asyncHandler(async (req, res) => {
     }
     if (data.date !== undefined) data.date = parseDate(data.date, "date");
     const next = { ...previous.toObject(), ...data };
-    await validateReferences(next);
-    if (previous.type === "transfer_to_savings") await applyGoalDelta(previous.savingsGoalId, -signedSavingsEffect(previous), session);
+    await validateReferences(next, req.user._id);
+    if (previous.type === "transfer_to_savings") await applyGoalDelta(req.user._id, previous.savingsGoalId, -signedSavingsEffect(previous), session);
     if (next.type === "transfer_to_savings") {
       const effect = signedSavingsEffect(next);
-      await applyGoalDelta(next.savingsGoalId, effect, session);
-      if (next.transferDirection !== "withdraw" && await currentAvailableBalance(session) < 0) throw httpError(400, "El saldo disponible no alcanza para este ahorro.");
+      await applyGoalDelta(req.user._id, next.savingsGoalId, effect, session);
+      if (next.transferDirection !== "withdraw" && await currentAvailableBalance(req.user._id, session) < 0) throw httpError(400, "El saldo disponible no alcanza para este ahorro.");
     }
     Object.assign(previous, data);
     return previous.save({ session });
@@ -137,9 +138,9 @@ export const updateTransaction = asyncHandler(async (req, res) => {
 
 export const deleteTransaction = asyncHandler(async (req, res) => {
   await inTransaction(async (session) => {
-    const transaction = await Transaction.findById(req.params.id).session(session);
+    const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user._id }).session(session);
     if (!transaction) throw httpError(404, "Transacción no encontrada.");
-    if (transaction.type === "transfer_to_savings") await applyGoalDelta(transaction.savingsGoalId, -signedSavingsEffect(transaction), session);
+    if (transaction.type === "transfer_to_savings") await applyGoalDelta(req.user._id, transaction.savingsGoalId, -signedSavingsEffect(transaction), session);
     await transaction.deleteOne({ session });
   });
   res.status(204).end();

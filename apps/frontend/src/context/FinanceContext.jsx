@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import FinanceContext from "./FinanceContextValue";
+import { useAuth } from "./useAuth";
 import { initialState, makeId, monthKey, today } from "./financeUtils";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "../services/api";
 
-const STORAGE_KEY = "fin-wallet-state-v1";
+const LEGACY_STORAGE_KEY = "fin-wallet-state-v1";
 const paymentTypeFromApi = { cash: "Efectivo", debit: "Tarjeta de débito", credit: "Tarjeta de crédito", bank: "Cuenta bancaria" };
 const paymentTypeToApi = { Efectivo: "cash", "Tarjeta de débito": "debit", "Tarjeta de crédito": "credit", "Cuenta bancaria": "bank" };
 const idOf = (item) => String(item?._id ?? item?.id ?? "");
@@ -105,11 +106,24 @@ async function getRemoteState(previousAlerts, newCharges = [], preferences = ini
   return fromApiState({ transactions, categories, paymentMethods, budgets, goals, automaticPayments, debts, preferences }, alerts.slice(0, 30));
 }
 
-function loadState() {
+function loadState(storageKey, user) {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return initialState;
-    return { ...initialState, ...JSON.parse(saved) };
+    let saved = localStorage.getItem(storageKey);
+    if (!saved && user.mode === "local" && !localStorage.getItem("fin-wallet-legacy-state-migrated")) {
+      saved = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (saved) {
+        localStorage.setItem(storageKey, saved);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
+      localStorage.setItem("fin-wallet-legacy-state-migrated", "true");
+    }
+    if (!saved) return { ...initialState, preferences: { ...initialState.preferences, currency: user.currency || "CLP" } };
+    const restored = JSON.parse(saved);
+    return {
+      ...initialState,
+      ...restored,
+      preferences: { ...initialState.preferences, ...restored.preferences, currency: restored.preferences?.currency || user.currency || "CLP" },
+    };
   } catch (error) {
     console.error("No se pudo cargar el estado guardado de Fin Wallet.", error);
     return initialState;
@@ -226,19 +240,22 @@ const collectionPaths = {
 };
 
 export function FinanceProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+  const { user, mode: authMode } = useAuth();
+  const storageKey = `${LEGACY_STORAGE_KEY}:${user.id}`;
+  const [state, dispatch] = useReducer(reducer, { storageKey, user }, (initial) => loadState(initial.storageKey, { ...initial.user, mode: authMode }));
   const stateRef = useRef(state);
-  const [storageMode, setStorageMode] = useState("connecting");
+  const [remoteStorageMode, setStorageMode] = useState(authMode === "api" ? "connecting" : "local");
+  const storageMode = authMode === "local" ? "local" : remoteStorageMode;
   const [apiError, setApiError] = useState("");
 
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(storageKey, JSON.stringify(state));
     } catch (error) {
       console.error("No se pudo guardar el estado de Fin Wallet.", error);
     }
-  }, [state]);
+  }, [state, storageKey]);
 
   const syncRemoteState = useCallback(async (extraAlerts = []) => {
     const remote = await getRemoteState([...stateRef.current.alerts], extraAlerts, stateRef.current.preferences);
@@ -247,6 +264,7 @@ export function FinanceProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (authMode !== "api") return undefined;
     let active = true;
     const bootstrap = async () => {
       try {
@@ -276,7 +294,7 @@ export function FinanceProvider({ children }) {
     };
     bootstrap();
     return () => { active = false; };
-  }, []);
+  }, [authMode]);
 
   const runMutation = useCallback(async (remoteWork, localWork) => {
     if (storageMode !== "api") {
