@@ -254,6 +254,20 @@
 .autopay-master-row > b { font-size: 10px; white-space: nowrap; }
 .preferences-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .preferences-grid label { align-content: start; font-size: 11px; }
+.connection-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 11px 14px; border: 1.5px solid var(--ink); border-radius: 14px; box-shadow: 2px 2px 0 var(--ink); font-size: 10px; }
+.connection-banner > strong { font-size: 11px; }
+.connection-banner > span:nth-of-type(2) { color: var(--muted); }
+.connection-banner > small { width: 100%; color: #a43754; }
+.connection-dot { width: 9px; height: 9px; border: 1px solid var(--ink); border-radius: 50%; background: #fbbf24; }
+.connection-banner--api { background: #e2f5ea; }
+.connection-banner--api .connection-dot { background: #34d399; }
+.connection-banner--local { background: #fff4ca; }
+.connection-banner--local .connection-dot { background: #fbbf24; }
+.connection-banner--connecting { background: #f3e8ff; }
+.demo-reset { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 21px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: #fffafc; }
+.demo-reset > div { display: flex; flex-direction: column; gap: 4px; }
+.demo-reset strong { font-size: 11px; }
+.demo-reset span { color: var(--muted); font-size: 10px; }
 .preferences-grid small { color: var(--muted); font-size: 9px; font-weight: 400; }
 .theme-setting { display: flex !important; flex-direction: column; }
 .theme-switch { height: 36px; border: 1px solid var(--ink); border-radius: 10px; background: #fff0e5; font-size: 11px; font-weight: 700; cursor: pointer; }
@@ -345,6 +359,7 @@
   .master-list { grid-template-columns: 1fr; }
   .method-grid { grid-template-columns: 1fr; }
   .preferences-grid { grid-template-columns: 1fr; gap: 13px; }
+  .demo-reset { align-items: flex-start; flex-direction: column; }
   .fab { right: 17px; bottom: 84px; height: 50px; }
   .fab--global { right: 17px; }
   .modal-card { padding: 20px 17px; }

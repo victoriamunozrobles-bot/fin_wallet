@@ -18,7 +18,7 @@ function QuickActionModal({ onClose, editTransaction = null }) {
   const selectableCategories = categories.filter((item) => item.type === type);
   const selectedCategory = selectableCategories.some((item) => item.name === category) ? category : selectableCategories[0]?.name ?? "";
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
@@ -27,17 +27,20 @@ function QuickActionModal({ onClose, editTransaction = null }) {
     }
     if (type === "savings") {
       const savedValue = editTransaction && editTransaction.type === "savings" ? value * Math.sign(editTransaction.amount) : value;
-      const success = editTransaction
+      const success = await (editTransaction
         ? updateTransaction({ ...editTransaction, amount: savedValue, date, category: goals.find((goal) => goal.id === goalId)?.name ?? category, goalId })
-        : addSavings(goalId, value, date, description || "Aporte a meta");
+        : addSavings(goalId, value, date, description || "Aporte a meta"));
       if (!success) {
         setError("Revisa el saldo disponible y el monto de la meta.");
         return;
       }
     } else {
       const transaction = { ...(editTransaction ?? {}), type, amount: value, date, category: selectedCategory, paymentMethod, description: description.trim() || selectedCategory };
-      if (editTransaction) updateTransaction(transaction);
-      else addTransaction(transaction);
+      const success = await (editTransaction ? updateTransaction(transaction) : addTransaction(transaction));
+      if (!success) {
+        setError("No se pudo guardar. Revisa los datos e inténtalo nuevamente.");
+        return;
+      }
     }
     onClose();
   };

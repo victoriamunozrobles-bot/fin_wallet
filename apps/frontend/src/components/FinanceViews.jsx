@@ -55,7 +55,7 @@ function UpcomingPayments({ onPayment }) {
 
 export function Dashboard({ onCreate }) {
   const finance = useFinance();
-  const { transactions, alerts, budgets, categories, preferences, totalIncome, totalExpenses, totalSavings, available, processAutomaticPayments, addTransaction, setCollection, addAlert } = finance;
+  const { transactions, alerts, budgets, categories, preferences, totalIncome, totalExpenses, totalSavings, available, processAutomaticPayments, simulateRecurringPayment } = finance;
   const monthTransactions = transactions.filter((item) => item.date.startsWith(monthNow));
   const incomeThisMonth = monthTransactions.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0);
   const expenseThisMonth = monthTransactions.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0);
@@ -64,12 +64,6 @@ export function Dashboard({ onCreate }) {
     return budgetStatus(spent, budget.limit, preferences.threshold).ratio >= preferences.threshold;
   }).length;
   const todaysPaymentAlerts = alerts.filter((item) => item.kind === "automatic" && item.date === today()).length;
-  const runPayment = (payment) => {
-    if (payment.lastChargedMonth === monthNow) return;
-    addTransaction({ type: "expense", amount: payment.amount, date: today(), category: payment.category, paymentMethod: payment.paymentMethod, description: `${payment.name} · pago automático`, automaticPaymentId: payment.id });
-    setCollection("automaticPayments", finance.automaticPayments.map((item) => item.id === payment.id ? { ...item, lastChargedMonth: monthNow } : item));
-    addAlert({ kind: "automatic", message: `Se registró el pago de ${payment.name} por ${money(payment.amount, preferences.currency)}.` });
-  };
   const latest = transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
 
   const todayLabel = new Date(`${today()}T12:00:00`).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
@@ -83,7 +77,7 @@ export function Dashboard({ onCreate }) {
       <section className="panel alert-panel"><div className="section-title"><div><p className="eyebrow">OJO CON ESTO</p><h2>Centro de alertas</h2></div><span className="count-badge">{budgetAlerts + todaysPaymentAlerts}</span></div><BudgetAlertList />
         {alerts.filter((item) => item.kind === "automatic" && item.date === today()).map((item) => <div className="alert-card alert-card--good" key={item.id}><span>✓</span><div><strong>Pago automático registrado</strong><p>{item.message}</p></div></div>)}
       </section>
-      <section className="panel payments-panel"><div className="section-title"><div><p className="eyebrow">A LA VISTA</p><h2>Próximos pagos</h2></div><span className="section-icon">↻</span></div><UpcomingPayments onPayment={runPayment} /></section>
+      <section className="panel payments-panel"><div className="section-title"><div><p className="eyebrow">A LA VISTA</p><h2>Próximos pagos</h2></div><span className="section-icon">↻</span></div><UpcomingPayments onPayment={simulateRecurringPayment} /></section>
     </div>
     <section className="panel recent-panel"><div className="section-title"><div><p className="eyebrow">LO MÁS RECIENTE</p><h2>Movimientos</h2></div><button className="text-button" onClick={() => window.dispatchEvent(new CustomEvent("fin-wallet-navigate", { detail: "transactions" }))}>Ver historial →</button></div>
       <TransactionRows items={latest} compact categories={categories} currency={preferences.currency} />
@@ -278,7 +272,7 @@ export function Planning() {
 }
 
 export function Settings() {
-  const { categories, paymentMethods, automaticPayments, budgets, transactions, preferences, setCollection, setPreferences, addTransaction, addAlert } = useFinance();
+  const { categories, paymentMethods, automaticPayments, budgets, transactions, preferences, storageMode, apiError, setCollection, setPreferences, simulateRecurringPayment, resetDemoData } = useFinance();
   const [categoryForm, setCategoryForm] = useState(null);
   const [methodForm, setMethodForm] = useState(null);
   const [paymentForm, setPaymentForm] = useState(null);
@@ -322,14 +316,12 @@ export function Settings() {
   const removeMethod = (item) => {
     if (window.confirm(`¿Eliminar el medio ${item.name}?`)) setCollection("paymentMethods", paymentMethods.filter((method) => method.id !== item.id));
   };
-  const simulatePayment = (payment) => {
-    if (payment.lastChargedMonth === monthNow) return;
-    addTransaction({ type: "expense", amount: payment.amount, date: today(), category: payment.category, paymentMethod: payment.paymentMethod, description: `${payment.name} · pago automático`, automaticPaymentId: payment.id });
-    setCollection("automaticPayments", automaticPayments.map((item) => item.id === payment.id ? { ...item, lastChargedMonth: monthNow } : item));
-    addAlert({ kind: "automatic", message: `Se registró el pago de ${payment.name} por ${money(payment.amount, preferences.currency)}.` });
+  const confirmReset = () => {
+    if (window.confirm("Esto reemplazará los datos actuales con los datos de demostración. ¿Continuar?")) resetDemoData();
   };
   return <div className="view-content">
     <PageHeading eyebrow="HECHO A TU MANERA" title="Tu espacio, tus reglas" description="Personaliza las categorías, medios de pago y recordatorios." />
+    <div className={`connection-banner connection-banner--${storageMode}`}><span className="connection-dot"/><strong>{storageMode === "api" ? "MongoDB API conectada" : storageMode === "connecting" ? "Conectando con la API…" : "Modo Local"}</strong><span>{storageMode === "api" ? "Datos sincronizados con el servidor" : storageMode === "local" ? "Los cambios se guardan en este navegador" : "Cargando tus datos"}</span>{apiError && <small role="alert">{apiError}</small>}</div>
     <section className="settings-section"><div className="section-title"><div><p className="eyebrow">ORGANIZA TUS MOVIMIENTOS</p><h2>Categorías</h2></div><button className="button button--primary" onClick={() => setCategoryForm({ name: "", type: "expense", emoji: "✿", color: "#FFE5EC" })}>＋ Nueva categoría</button></div>
       {categoryForm && <form className="inline-form" onSubmit={saveCategory}><label>Nombre<input required maxLength="24" value={categoryForm.name} onChange={(event) => setCategoryForm({ ...categoryForm, name: event.target.value })}/></label><label>Tipo<select value={categoryForm.type} onChange={(event) => setCategoryForm({ ...categoryForm, type: event.target.value })}><option value="expense">Gasto</option><option value="income">Ingreso</option></select></label><label>Emoji<input maxLength="4" value={categoryForm.emoji} onChange={(event) => setCategoryForm({ ...categoryForm, emoji: event.target.value })}/></label><label>Color<input type="color" value={categoryForm.color} onChange={(event) => setCategoryForm({ ...categoryForm, color: event.target.value })}/></label><button className="button button--primary">Guardar</button><button className="text-button" type="button" onClick={() => setCategoryForm(null)}>Cancelar</button></form>}
       <div className="master-list">{categories.map((item) => <div className="master-row" key={item.id}><span className="category-icon" style={{ background: item.color }}>{item.emoji}</span><div><strong>{item.name}</strong><span>{item.type === "expense" ? "Gasto" : "Ingreso"}</span></div><button className="text-button" onClick={() => setCategoryForm({ ...item })}>Editar</button><button className="icon-button" aria-label={`Eliminar ${item.name}`} onClick={() => removeCategory(item)}>×</button></div>)}</div>
@@ -340,9 +332,9 @@ export function Settings() {
     </section>
     <section className="settings-section"><div className="section-title"><div><p className="eyebrow">QUE NADA TE TOME POR SORPRESA</p><h2>Pagos automáticos</h2></div><button className="button button--primary" onClick={() => setPaymentForm({ name: "", amount: "", category: categories.find((item) => item.type === "expense")?.name ?? "", paymentMethod: paymentMethods[0]?.name ?? "", day: 1, lastChargedMonth: "" })}>＋ Programar pago</button></div>
       {paymentForm && <form className="inline-form autopay-form" onSubmit={savePayment}><label>Servicio<input required value={paymentForm.name} onChange={(event) => setPaymentForm({ ...paymentForm, name: event.target.value })}/></label><label>Monto<input type="number" min="1" required value={paymentForm.amount} onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })}/></label><label>Categoría<select value={paymentForm.category} onChange={(event) => setPaymentForm({ ...paymentForm, category: event.target.value })}>{categories.filter((item) => item.type === "expense").map((item) => <option key={item.id}>{item.name}</option>)}</select></label><label>Medio de pago<select value={paymentForm.paymentMethod} onChange={(event) => setPaymentForm({ ...paymentForm, paymentMethod: event.target.value })}>{paymentMethods.map((item) => <option key={item.id}>{item.name}</option>)}</select></label><label>Día del mes<input type="number" min="1" max="31" required value={paymentForm.day} onChange={(event) => setPaymentForm({ ...paymentForm, day: event.target.value })}/></label><button className="button button--primary">Guardar pago</button><button className="text-button" type="button" onClick={() => setPaymentForm(null)}>Cancelar</button></form>}
-      <div className="master-list">{automaticPayments.map((item) => <div className="master-row autopay-master-row" key={item.id}><span className="category-icon pastel-lavender">↻</span><div><strong>{item.name}</strong><span>Día {item.day} · {item.category} · {item.paymentMethod}</span></div><b>{money(item.amount, preferences.currency)}</b><button className="text-button" onClick={() => setPaymentForm({ ...item })}>Editar</button><button className="button button--small button--plain" disabled={item.lastChargedMonth === monthNow} onClick={() => simulatePayment(item)}>Simular día de cobro</button><button className="icon-button" aria-label={`Eliminar ${item.name}`} onClick={() => { if (window.confirm(`¿Eliminar el pago de ${item.name}?`)) setCollection("automaticPayments", automaticPayments.filter((payment) => payment.id !== item.id)); }}>×</button></div>)}</div>
+      <div className="master-list">{automaticPayments.map((item) => <div className="master-row autopay-master-row" key={item.id}><span className="category-icon pastel-lavender">↻</span><div><strong>{item.name}</strong><span>Día {item.day} · {item.category} · {item.paymentMethod}</span></div><b>{money(item.amount, preferences.currency)}</b><button className="text-button" onClick={() => setPaymentForm({ ...item })}>Editar</button><button className="button button--small button--plain" disabled={item.lastChargedMonth === monthNow} onClick={() => simulateRecurringPayment(item)}>Simular día de cobro</button><button className="icon-button" aria-label={`Eliminar ${item.name}`} onClick={() => { if (window.confirm(`¿Eliminar el pago de ${item.name}?`)) setCollection("automaticPayments", automaticPayments.filter((payment) => payment.id !== item.id)); }}>×</button></div>)}</div>
       <p className="form-hint">Los pagos vencidos se registran al abrir la app. También puedes simular un cobro para probar el flujo completo.</p>
     </section>
-    <section className="settings-section preferences-section"><div className="section-title"><div><p className="eyebrow">EL TOQUE FINAL</p><h2>Preferencias</h2></div></div><div className="preferences-grid"><label>Alerta preventiva<input type="number" min="1" max="99" value={preferences.threshold} onChange={(event) => setPreferences({ threshold: Number(event.target.value) })}/><small>Avisar al llegar a este porcentaje del presupuesto</small></label><label>Moneda<select value={preferences.currency} onChange={(event) => setPreferences({ currency: event.target.value })}><option value="CLP">Peso chileno · CLP</option><option value="ARS">Peso argentino · ARS</option><option value="MXN">Peso mexicano · MXN</option><option value="USD">Dólar · USD</option><option value="EUR">Euro · EUR</option></select></label><label className="theme-setting">Tema de la app<button className="theme-switch" onClick={() => setPreferences({ theme: preferences.theme === "light" ? "dark" : "light" })}>{preferences.theme === "light" ? "☀ Claro" : "☾ Oscuro"}</button></label></div></section>
+    <section className="settings-section preferences-section"><div className="section-title"><div><p className="eyebrow">EL TOQUE FINAL</p><h2>Preferencias</h2></div></div><div className="preferences-grid"><label>Alerta preventiva<input type="number" min="1" max="99" value={preferences.threshold} onChange={(event) => setPreferences({ threshold: Number(event.target.value) })}/><small>Avisar al llegar a este porcentaje del presupuesto</small></label><label>Moneda<select value={preferences.currency} onChange={(event) => setPreferences({ currency: event.target.value })}><option value="CLP">Peso chileno · CLP</option><option value="ARS">Peso argentino · ARS</option><option value="MXN">Peso mexicano · MXN</option><option value="USD">Dólar · USD</option><option value="EUR">Euro · EUR</option></select></label><label className="theme-setting">Tema de la app<button className="theme-switch" onClick={() => setPreferences({ theme: preferences.theme === "light" ? "dark" : "light" })}>{preferences.theme === "light" ? "☀ Claro" : "☾ Oscuro"}</button></label></div><div className="demo-reset"><div><strong>Restaurar datos de demostración</strong><span>Reemplaza movimientos, presupuestos y metas actuales.</span></div><button className="button button--plain" onClick={confirmReset}>Restaurar datos</button></div></section>
   </div>;
 }

@@ -1,0 +1,20 @@
+{
+  "name": "fin-wallet",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace @fin-wallet/frontend",
+    "dev:backend": "npm run dev --workspace @fin-wallet/backend",
+    "build": "npm run build --workspace @fin-wallet/frontend",
+    "lint": "npm run lint --workspace @fin-wallet/frontend",
+    "seed": "npm run seed --workspace @fin-wallet/backend",
+    "start:backend": "npm run start --workspace @fin-wallet/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
