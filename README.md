@@ -1,6 +1,54 @@
 # Fin Wallet
 
-Fin Wallet es una aplicación de finanzas personales con un frontend React/Vite y una API Node.js, Express y MongoDB/Mongoose. Mantiene el diseño Soft Feminine Neo-Brutalist y ofrece un modo local de respaldo cuando la API no está disponible.
+## 1. Información general
+
+- **Nombre del proyecto:** Fin Wallet
+- **Especialidad:** Web
+- **Fuente del proyecto:** Idea de producto para organizar finanzas personales; no se documenta un brief externo.
+- **Link a la fuente original:** [Repositorio del proyecto en GitHub](https://github.com/victoriamunozrobles-bot/fin_wallet). No hay un dataset ni una fuente externa del brief registrados.
+- **Link al proyecto publicado:** Pendiente de publicación; no hay una URL de despliegue documentada.
+
+## 2. Objetivo
+
+Fin Wallet ayuda a personas que quieren ordenar sus finanzas personales a entender cuánto pueden gastar y cómo avanzan hacia sus metas de ahorro.
+Reúne movimientos, presupuestos y pagos recurrentes en un solo lugar, con alertas para anticipar excesos y una alternativa local cuando la API no está disponible.
+
+## 3. Plan de trabajo
+
+1. **Exploración inicial:** definir el problema y los flujos principales: consulta de saldos, registro de movimientos, presupuestos y ahorro.
+2. **Preparación:** organizar el frontend, la API REST y la persistencia, y elegir el stack React/Vite, Node/Express y MongoDB.
+3. **Construcción:** implementar autenticación, dashboard, movimientos, análisis, presupuestos, metas de ahorro, pagos recurrentes y modo local.
+4. **Evaluación:** revisar los flujos principales y validar compilación y lint con los scripts disponibles; complementar con pruebas de uso y rendimiento antes de publicar.
+5. **Conclusiones y próximos pasos:** desplegar la aplicación, documentar la URL pública y medir rendimiento y experiencia con usuarios.
+
+## 4. Preguntas clave
+
+- ¿Cómo se protege y recupera la información financiera si el dispositivo o la base de datos dejan de estar disponibles?
+- ¿Cómo se mantendría la separación de datos por usuario y el rendimiento si crecieran la cantidad de cuentas y movimientos?
+- ¿Qué validaciones y pruebas de usabilidad hacen falta antes de publicar la aplicación?
+
+## 5. Qué se hizo y cómo
+
+- **Frontend:** React 19 y Vite 8, con pantallas de inicio, transacciones, análisis, presupuestos y ahorro, y configuración.
+- **Backend:** API REST con Node.js, Express y MongoDB mediante Mongoose. Los modelos financieros se asocian a una cuenta.
+- **Autenticación:** JWT en la API y contraseñas con bcryptjs; el modo local usa almacenamiento del navegador y deriva las contraseñas con PBKDF2.
+- **Funcionalidades:** registrar y editar movimientos, consultar el dashboard y análisis, administrar categorías y medios de pago, definir presupuestos y metas de ahorro, y procesar pagos recurrentes.
+- **Persistencia y disponibilidad:** cuando la API responde, los datos se guardan en MongoDB; si no está disponible, la app permite operar en modo local con datos separados por cuenta.
+- **Interfaz:** diseño Neo-Brutalista suave y demo con datos de ejemplo.
+
+## 6. Resultados
+
+Se entrega una aplicación web con registro e inicio de sesión, una vista general de las finanzas y módulos para movimientos, análisis, presupuestos, metas de ahorro, deudas y pagos recurrentes. Incluye alertas de presupuesto, progreso de ahorro y pagos automáticos; permite descargar el historial y ofrece una demo rápida. La aplicación puede seguir usándose en modo local cuando no responde la API, aunque en ese caso los cambios quedan en el navegador y no se sincronizan con MongoDB.
+
+No se documentan resultados de pruebas de rendimiento ni una publicación en producción.
+
+## 7. Conclusiones
+
+El proyecto integra una experiencia frontend completa con una API y persistencia por usuario, y contempla tanto la disponibilidad de la API como el uso local. Como siguiente mejora, priorizaría desplegar la aplicación y documentar el proceso, ampliar las pruebas automatizadas y evaluar la sincronización y recuperación de datos del modo local. En una entrevista destacaría el diseño del modelo de finanzas personales y el comportamiento híbrido entre API y almacenamiento local.
+
+## Documentación técnica
+
+Fin Wallet es una aplicación de finanzas personales con un frontend React/Vite y una API Node.js, Express y MongoDB/Mongoose. Mantiene el diseño Neo-Brutalista suave y ofrece un modo local de respaldo cuando la API no está disponible.
 
 ## Estructura
 
