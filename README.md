@@ -4,8 +4,8 @@
 
 - **Nombre del proyecto:** Fin Wallet
 - **Especialidad:** Web
-- **Fuente del proyecto:** Idea de producto para organizar finanzas personales; no se documenta un brief externo.
-- **Link a la fuente original:** [Repositorio del proyecto en GitHub](https://github.com/victoriamunozrobles-bot/fin_wallet). No hay un dataset ni una fuente externa del brief registrados.
+- **Fuente del proyecto:** Idea de producto para organizar finanzas personales.
+- **Link a la fuente original:** [Repositorio del proyecto en GitHub](https://github.com/victoriamunozrobles-bot/fin_wallet).
 - **Link al proyecto publicado:** Pendiente de publicación; no hay una URL de despliegue documentada.
 
 ## 2. Objetivo
@@ -23,9 +23,9 @@ Reúne movimientos, presupuestos y pagos recurrentes en un solo lugar, con alert
 
 ## 4. Preguntas clave
 
-- ¿Cómo se protege y recupera la información financiera si el dispositivo o la base de datos dejan de estar disponibles?
-- ¿Cómo se mantendría la separación de datos por usuario y el rendimiento si crecieran la cantidad de cuentas y movimientos?
-- ¿Qué validaciones y pruebas de usabilidad hacen falta antes de publicar la aplicación?
+- **¿Cómo se protege y recupera la información financiera si el dispositivo o la base de datos dejan de estar disponibles?** La API limita las operaciones a la cuenta autenticada y el modo local separa los datos por cuenta en el navegador. Sin embargo, los cambios locales no se sincronizan con MongoDB, por lo que no se recuperan automáticamente desde otro dispositivo; antes de publicar, implementaría y probaría copias de seguridad de la base de datos y una estrategia explícita de sincronización o exportación para los datos locales.
+- **¿Cómo se mantendría la separación de datos por usuario y el rendimiento si crecieran la cantidad de cuentas y movimientos?** Las colecciones financieras se asocian a un `userId` y la API aplica autenticación y alcance por usuario. Para sostener el crecimiento, mediría el rendimiento con conjuntos de datos representativos y revisaría índices, paginación y consultas agregadas según los resultados; esto requiere pruebas de carga que todavía no están documentadas.
+- **¿Qué validaciones y pruebas de usabilidad hacen falta antes de publicar la aplicación?** Validaría registro, inicio de sesión, aislamiento entre cuentas, creación y edición de movimientos, presupuestos, ahorro, pagos recurrentes y funcionamiento sin API. También probaría accesibilidad y comprensión de alertas con usuarios. El proyecto ofrece scripts de compilación y lint, pero no documenta una suite automatizada ni pruebas de rendimiento.
 
 ## 5. Qué se hizo y cómo
 
@@ -40,7 +40,6 @@ Reúne movimientos, presupuestos y pagos recurrentes en un solo lugar, con alert
 
 Se entrega una aplicación web con registro e inicio de sesión, una vista general de las finanzas y módulos para movimientos, análisis, presupuestos, metas de ahorro, deudas y pagos recurrentes. Incluye alertas de presupuesto, progreso de ahorro y pagos automáticos; permite descargar el historial y ofrece una demo rápida. La aplicación puede seguir usándose en modo local cuando no responde la API, aunque en ese caso los cambios quedan en el navegador y no se sincronizan con MongoDB.
 
-No se documentan resultados de pruebas de rendimiento ni una publicación en producción.
 
 ## 7. Conclusiones
 
@@ -103,7 +102,7 @@ El seed no borra información de otras cuentas.
 
 Con la API disponible, el frontend carga y modifica los datos en MongoDB. Si el servidor no responde, usa el estado del navegador (`localStorage`) y muestra **Modo Local** en Configuración. El indicador también muestra **MongoDB API conectada** al sincronizar correctamente.
 
-La variable opcional `VITE_API_URL` del frontend permite cambiar la ruta base de la API; por defecto es `/api`. No coloques secretos en variables `VITE_*`: se incorporan al bundle del navegador.
+La variable opcional `VITE_API_URL` del frontend permite cambiar la ruta base de la API; por defecto es `/api`.
 
 ## Semilla y restauración
 
